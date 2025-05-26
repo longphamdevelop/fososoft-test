@@ -2,44 +2,46 @@
 
 import { debounce } from 'lodash';
 import { motion } from 'motion/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Product } from '@/interfaces/product';
 import ProductCard from './ProductCard';
 
 function ListProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
-  const [count, setCount] = useState(0);
 
-  const fetchData = async () => {
-    if (loading) return;
+  const fetchCountRef = useRef(0);
+  const maxFetches = 4;
+
+  const fetchData = useCallback(async () => {
+    if (loading || fetchCountRef.current >= maxFetches) return;
+
     setLoading(true);
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
-    const data = (await res.json()) as Product[];
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
+      const data = (await res.json()) as Product[];
 
-    setProducts((prev) => [...prev, ...data]);
-    setCount((prev) => prev + 1);
-
-    setLoading(false);
-  };
-
-  const handleScroll = useCallback(
-    debounce(() => {
-      if (count < 4) {
-        const { scrollTop, scrollHeight, clientHeight } =
-          document.documentElement;
-
-        if (scrollTop + clientHeight >= scrollHeight - 300) {
-          fetchData();
-        }
-      }
-    }, 200),
-    [count],
-  );
+      setProducts((prev) => [...prev, ...data]);
+      fetchCountRef.current += 1;
+    } catch (error) {
+      console.error('Fetch error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
 
   useEffect(() => {
-    fetchData();
+    const handleScroll = debounce(() => {
+      const { scrollTop, scrollHeight, clientHeight } =
+        document.documentElement;
+
+      if (scrollTop + clientHeight >= scrollHeight - 300) {
+        fetchData();
+      }
+    }, 200);
+
+    fetchData(); // initial load
 
     window.addEventListener('scroll', handleScroll);
 
@@ -47,7 +49,7 @@ function ListProduct() {
       window.removeEventListener('scroll', handleScroll);
       handleScroll.cancel();
     };
-  }, []);
+  }, [fetchData]);
 
   return (
     <div className="flex flex-col">
@@ -56,6 +58,7 @@ function ListProduct() {
           <ProductCard key={index} {...product} />
         ))}
       </div>
+
       <motion.div
         initial="visible"
         className="flex items-center justify-center text-center"
@@ -93,6 +96,11 @@ function ListProduct() {
           <span className="sr-only">Loading...</span>
         </div>
       </motion.div>
+      {fetchCountRef.current >= maxFetches && !loading && (
+        <div className="py-10 text-center text-gray-500">
+          Bạn đã xem hết sản phẩm
+        </div>
+      )}
     </div>
   );
 }
