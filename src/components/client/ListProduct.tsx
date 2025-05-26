@@ -15,7 +15,7 @@ function ListProduct() {
     if (loading) return;
     setLoading(true);
 
-    const res = await fetch('http://localhost:3000/api/products');
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
     const data = (await res.json()) as Product[];
 
     setProducts((prev) => [...prev, ...data]);
